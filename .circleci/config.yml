@@ -19,7 +19,7 @@ jobs:
             - node_modules
       - run:
           name: Build Android APK
-          command: gradlew bundleRelease
+          command: ./gradlew bundleRelease
           paths:
             - android
       - run:
