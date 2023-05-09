@@ -25,6 +25,7 @@ workflows:
   # Name of workflow
   hello_and_goodbye:
     # List of jobs that will run
-    jobs:
+    
+    jobs: 
       - say_hello
       - say_goodbye
