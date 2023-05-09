@@ -21,7 +21,7 @@ jobs:
           name: Build Android APK
            paths:
            - android
-          command: ./gradlew bundleRelease
+          command: gradlew bundleRelease
       - run:
           name: Build iOS Archive
           command: |
