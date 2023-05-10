@@ -19,9 +19,7 @@ jobs:
             - node_modules
       - run:
           name: Build Android APK
-          command: ./gradlew bundleRelease
-          paths:
-            - android
+          command: cd android && gradlew bundleRelease && cd ..
       - run:
           name: Build iOS Archive
           command: |
