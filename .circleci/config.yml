@@ -2,30 +2,91 @@ version: 2.1
 jobs:
   build:
     working_directory: ~/test
+
     docker:
-      - image: reactnativecommunity/react-native-android
+      - image: circleci/android:api-30
+
+    environment:
+      JVM_OPTS: -Xmx3200m
+
     steps:
       - checkout
+
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "package.json" }}
             - v1-dependencies-
+
       - run:
-          name: Install Dependencies
-          command: yarn install
-      - save_cache:
-          key: v1-dependencies-{{ checksum "package.json" }}
-          paths:
-            - node_modules
-      - run:
-          name: Build Android APK
-          command: cd android && gradlew bundleRelease && cd ..
-      - run:
-          name: Build iOS Archive
+          name: Install Node.js and dependencies
           command: |
-            yarn ios:build
+            curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            sudo npm install -g react-native-cli
+            npm ci
+
+      - run:
+          name: Restore Android dependencies
+          command: |
+            if [[ ! -e $ANDROID_HOME/build-tools/30.0.3/zipalign ]]; then echo y | sdkmanager "build-tools;30.0.3"; fi
+            yes | sdkmanager "platforms;android-30"
+            yes | sdkmanager "platform-tools"
+            yes | sdkmanager "tools"
+            yes | sdkmanager "extras;android;m2repository"
+            yes | sdkmanager "extras;google;m2repository"
+            yes | sdkmanager --update
+
+      - run:
+          name: Build Android release
+          command: |
+            cd android
+            chmod +x ./gradlew
+            ./gradlew clean assembleRelease
+
+      - persist_to_workspace:
+          root: ~/test
+          paths:
+            - ./android/app/build/outputs/apk/release
+
+  deploy:
+    docker:
+      - image: circleci/python:3.9
+
+    steps:
+      - attach_workspace:
+          at: ~/test
+
+      - run:
+          name: Generate APK signature
+          command: |
+            mkdir -p ~/.android/
+            echo "$KEYSTORE_BASE64" | base64 --decode > ~/.android/release.keystore
+            echo "$KEYSTORE_PROPERTIES" > ~/.android/release.properties
+            cd android/app/build/outputs/apk/release
+            jarsigner -sigalg SHA1withRSA -digestalg SHA1 -keystore ~/.android/release.keystore -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" app-release-unsigned.apk "$ALIAS"
+
+      - run:
+          name: Zipalign APK
+          command: |
+            zipalign -v -p 4 app-release-unsigned.apk app-release-aligned.apk
+
+      - run:
+          name: Upload APK
+          command: |
+            mkdir -p ~/artifacts/
+            mv app-release-aligned.apk ~/artifacts/
+
+      - store_artifacts:
+          path: ~/artifacts/
+
 workflows:
   version: 2
-  build-deploy:
+  build-and-deploy:
     jobs:
       - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
