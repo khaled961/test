@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/test
     docker:
-      - image: circleci/node:14.17.0
+      - image: reactnativecommunity/react-native-android
     steps:
       - checkout
       - restore_cache:
